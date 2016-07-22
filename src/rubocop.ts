@@ -43,53 +43,12 @@ export class Rubocop {
         const executeFile = this.path + this.command;
 
         let onDidExec = (error: Error, stdout: Buffer, stderr: Buffer) => {
-            if (error && (<any>error).code === 'ENOENT') {
-                vscode.window.showWarningMessage(`${executeFile} is not executable`);
-                return;
-            } else if (error && (<any>error).code === 127) {
-                let errorMessage = stderr.toString();
-                vscode.window.showWarningMessage(errorMessage);
-                console.log(error.message);
+            if (!this.checkErrorCode(error, stderr)) {
                 return;
             }
 
             this.diag.clear();
-            let output: string = stdout.toString();
-            let rubocop: RubocopOutput;
-            try {
-                rubocop = JSON.parse(output);
-            } catch (e) {
-                if (e instanceof SyntaxError) {
-                    let regex = /[\r\n \t]/g;
-                    let message = output.replace(regex, ' ');
-                    let errorMessage = `Error on parsing output (It might non-JSON output) : "${message}"`;
-                    vscode.window.showWarningMessage(errorMessage);
-                    return;
-                }
-            }
-
-            if (rubocop === undefined) {
-                let errorMessage = stderr.toString();
-                vscode.window.showWarningMessage(errorMessage);
-                return;
-            }
-
-            let entries: [vscode.Uri, vscode.Diagnostic[]][] = [];
-            rubocop.files.forEach((file: RubocopFile) => {
-                let diagnostics = [];
-                const url = vscode.Uri.file(fileName);
-                file.offenses.forEach((offence: RubocopOffense) => {
-                    const loc = offence.location;
-                    const range = new vscode.Range(
-                        loc.line - 1, loc.column - 1, loc.line - 1, loc.length + loc.column - 1);
-                    const sev = this.severity(offence.severity);
-                    const message = `${offence.message} (${offence.severity}:${offence.cop_name})`;
-                    const diagnostic = new vscode.Diagnostic(
-                        range, message, sev);
-                    diagnostics.push(diagnostic);
-                });
-                entries.push([url, diagnostics]);
-            });
+            let entries = this.parseOutput(stdout, stderr);
 
             this.diag.set(entries);
         };
@@ -117,6 +76,69 @@ export class Rubocop {
         }
 
         return commandArguments;
+    }
+
+    private checkErrorCode(error: Error, stderr: Buffer): boolean {
+        let code: any = undefined;
+        if (error) {
+            code = (<any>error).code;
+        }
+
+        // ENOENT
+        if (code === 'ENOENT') {
+            vscode.window.showWarningMessage(`${(<any>error).path} is not executable`);
+            return false;
+        } else if (code === 127) {
+            let errorMessage = stderr.toString();
+            vscode.window.showWarningMessage(errorMessage);
+            console.log(error.message);
+            return false;
+        }
+
+        return true;
+    }
+
+    private parseOutput(stdout: Buffer, stderr: Buffer): [vscode.Uri, vscode.Diagnostic[]][] {
+        this.diag.clear();
+        let output: string = stdout.toString();
+        let rubocop: RubocopOutput;
+        try {
+            rubocop = JSON.parse(output);
+        } catch (e) {
+            if (e instanceof SyntaxError) {
+                let regex = /[\r\n \t]/g;
+                let message = output.replace(regex, ' ');
+                let errorMessage = `Error on parsing output (It might non-JSON output) : "${message}"`;
+                vscode.window.showWarningMessage(errorMessage);
+                return;
+            }
+        }
+
+        if (rubocop === undefined) {
+            let errorMessage = stderr.toString();
+            vscode.window.showWarningMessage(errorMessage);
+            return;
+        }
+
+        let entries: [vscode.Uri, vscode.Diagnostic[]][] = [];
+        rubocop.files.forEach((file: RubocopFile) => {
+            let diagnostics = [];
+            const filePath = path.join(vscode.workspace.rootPath, file.path);
+            const url = vscode.Uri.file(filePath);
+            file.offenses.forEach((offence: RubocopOffense) => {
+                const loc = offence.location;
+                const range = new vscode.Range(
+                    loc.line - 1, loc.column - 1, loc.line - 1, loc.length + loc.column - 1);
+                const sev = this.severity(offence.severity);
+                const message = `${offence.message} (${offence.severity}:${offence.cop_name})`;
+                const diagnostic = new vscode.Diagnostic(
+                    range, message, sev);
+                diagnostics.push(diagnostic);
+            });
+            entries.push([url, diagnostics]);
+        });
+
+        return entries;
     }
 
     private resetConfig(): void {
