@@ -42,7 +42,7 @@ export class Rubocop {
 
         const executeFile = this.path + this.command;
 
-        let onDidExec = (error: Error, stdout: Buffer, stderr: Buffer) => {
+        let onDidExec = (error: Error, stdout: string, stderr: string) => {
             if (!this.checkErrorCode(error, stderr)) {
                 return;
             }
@@ -68,6 +68,7 @@ export class Rubocop {
         if (this.configPath === '') {
             return commandArguments;
         }
+
         if (fs.existsSync(this.configPath)) {
             const config = ['--config', this.configPath];
             commandArguments = commandArguments.concat(config);
@@ -78,7 +79,7 @@ export class Rubocop {
         return commandArguments;
     }
 
-    private checkErrorCode(error: Error, stderr: Buffer): boolean {
+    private checkErrorCode(error: Error, stderr: string): boolean {
         let code: any = undefined;
         if (error) {
             code = (<any>error).code;
@@ -98,9 +99,9 @@ export class Rubocop {
         return true;
     }
 
-    private parseOutput(stdout: Buffer, stderr: Buffer): [vscode.Uri, vscode.Diagnostic[]][] {
+    private parseOutput(stdout: string, stderr: string): [vscode.Uri, vscode.Diagnostic[]][] {
         this.diag.clear();
-        let output: string = stdout.toString();
+        let output: string = stdout;
         let rubocop: RubocopOutput;
         try {
             rubocop = JSON.parse(output);
@@ -148,6 +149,7 @@ export class Rubocop {
         if (!this.path || 0 === this.path.length) {
             this.path = this.autodetectExecutePath();
         }
+
         this.configPath = conf.get('configFilePath', '');
         this.onSave = conf.get('onSave', true);
     }
