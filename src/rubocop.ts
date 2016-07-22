@@ -104,15 +104,16 @@ export class Rubocop {
 
     // extract argument to an array
     protected commandArguments(fileName: string): Array<string> {
-        let commandArguments = [fileName, '--format', 'json'];
+        let commandArguments = [fileName, '--format', 'json', '--force-exclusion'];
 
-        if (this.configPath !== '') {
-            if (fs.existsSync(this.configPath)) {
-                const config = ['--config', this.configPath];
-                commandArguments = commandArguments.concat(config);
-            } else {
-                vscode.window.showWarningMessage(`${this.configPath} file does not exist. Ignoring...`);
-            }
+        if (this.configPath === '') {
+            return commandArguments;
+        }
+        if (fs.existsSync(this.configPath)) {
+            const config = ['--config', this.configPath];
+            commandArguments = commandArguments.concat(config);
+        } else {
+            vscode.window.showWarningMessage(`${this.configPath} file does not exist. Ignoring...`);
         }
 
         return commandArguments;
@@ -129,6 +130,7 @@ export class Rubocop {
         this.onSave = conf.get('onSave', true);
     }
 
+    // convert rubocop severity to vscode severity
     private severity(sev: string): vscode.DiagnosticSeverity {
         switch (sev) {
             case 'refactor': return vscode.DiagnosticSeverity.Hint;
