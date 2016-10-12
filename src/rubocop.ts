@@ -96,7 +96,7 @@ export class Rubocop {
         };
 
         let args = this.commandArguments(fileName);
-        return cp.execFile(executeFile, args, { cwd: currentPath }, onDidExec);
+        return cp.execFile(executeFile, args, { cwd: currentPath, maxBuffer: 1024 * 1024 }, onDidExec);
     }
 
     public get isOnSave(): boolean {
